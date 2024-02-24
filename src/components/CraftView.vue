@@ -1,16 +1,18 @@
-<script lang="ts" setup>
-import { gql } from '@apollo/client/core';
-import { useQuery } from '@vue/apollo-composable';
-import { useRoute } from 'vue-router';
-import UpdateCraftForm from './UpdateCraftForm.vue';
-import { computed, onMounted, ref } from 'vue';
-const showModal = ref(false);
-const router = useRoute();
+<script setup>
+import { gql } from "@apollo/client/core";
+import { useQuery, useResult } from "@vue/apollo-composable";
+import { useRoute } from "vue-router";
+import { ref } from "vue";
+
+import UpdateCraftForm from "./UpdateCraftForm.vue";
+
 const craftQuery = gql`
   query ($id: ID) {
     Craft(id: $id) {
+      id
       name
       type
+      brand
       price
       age
       owner {
@@ -21,53 +23,79 @@ const craftQuery = gql`
     }
   }
 `;
-const { result } = useQuery(craftQuery, { id: router.params.id });
-const data = computed(() => result.value?.Craft);
-console.log(data.value);
-onMounted(() => {
-  console.log('CraftView mounted');
-  console.log(showModal.value);
-});
-console.log(showModal.value);
+const route = useRoute();
+
+const { result, refetch } = useQuery(craftQuery, { id: route.params.id });
+
+const craft = useResult(result, null, (data) => data.Craft);
+
+const showModal = ref(false);
+
+function handleRefresh() {
+  showModal.value = false;
+  refetch();
+}
+
+const errorMessage = ref("");
+function handleError() {
+  errorMessage.value = "There was an error, reverting values."
+}
 </script>
 
 <template>
-  <h1>Welcome to the Jakes store</h1>
-  <h2>{{ data.name }} made by {{ data.type }}</h2>
-  <span>
-    This craft is {{ data.age }} years old and costs
-    {{ data.price.toLocaleString('uk') }}$
-  </span>
-  <p v-if="data.owner">
-    This craft is owned by {{ data.owner.firstName }} {{ data.owner.lastName }}
+  <div v-if="errorMessage" class="error">{{ errorMessage }}</div>
+
+  <h2>{{ craft?.name }} made by {{ craft?.brand }}</h2>
+
+  <p>This craft is {{ craft?.age }} months old and costs ${{ craft?.price }}.</p>
+
+  <p v-if="craft?.owner">
+    This craft is owned by {{ craft.owner.firstName }}
+    {{ craft.owner.lastName }}.
   </p>
-  <p v-else>This craft is available to buy</p>
+  <p v-else>This craft is available for purchase.</p>
+
   <button @click="showModal = !showModal">Update</button>
   <div v-if="showModal" class="modal">
-    <div class="modal__inner">
-        <UpdateCraftForm :craft="data" @close="showModal = !showModal" />
+    <div class="modal-inner">
+      <UpdateCraftForm
+        :craft="craft"
+        @close="showModal = !showModal"
+        @updated="handleRefresh()"
+        @error="handleError()"
+      />
     </div>
   </div>
 </template>
+
 <style scoped>
 .modal {
   position: fixed;
   top: 50%;
   left: 50%;
-  width: 700px;
+  width: 600px;
   height: 400px;
   transform: translate(-50%, -50%);
   z-index: 1000;
-  background-color: rgb(255, 255, 255);
-  box-shadow: 0 0 60px 10px rgba(0, 0, 0, 0.5);
+  background: white;
+  box-shadow: 0 0 60px 10px rgba(0, 0, 0, 0.9);
 }
-.modal__inner {
+
+.modal-inner {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
-  padding: 20px 40px 20px 20px;
   height: 100%;
+  padding: 20px 50px 20px 20px;
   overflow: auto;
+}
+
+.error {
+  border: 1px solid;
+  margin: 10px 0px;
+  padding: 15px 10px 15px 50px;
+  color: #d8000c;
+  background-color: #ffbaba;
 }
 </style>

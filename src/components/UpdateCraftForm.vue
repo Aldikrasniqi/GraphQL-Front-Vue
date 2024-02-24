@@ -1,15 +1,10 @@
-<script setup lang="ts">
-import { defineProps, reactive } from 'vue';
-import { EditCraft } from '@/types/Craft';
-import { gql } from '@apollo/client/core';
-import { useMutation } from '@apollo/client';
-const props = defineProps<{
-  craft: EditCraft;
-}>();
-console.log(props);
+<script setup>
+import { gql } from "@apollo/client/core";
+import { useMutation } from "@vue/apollo-composable";
+import { reactive } from "vue";
 
-const updateFields = reactive({
-  ...props.craft,
+const props = defineProps({
+  craft: Object,
 });
 
 const updateMutation = gql`
@@ -43,62 +38,101 @@ const updateMutation = gql`
     }
   }
 `;
-// TODO: Fix ts err
-// @ts-expect-error
-const { mutation: updateCraft, onError } = useMutation(updateMutation, () => {
+
+const craftQuery = gql`
+  query ($id: ID) {
+    Craft(id: $id) {
+      id
+      name
+      type
+      brand
+      price
+      age
+      owner {
+        id
+        firstName
+        lastName
+      }
+    }
+  }
+`;
+
+const { mutate: updateCraft, onError } = useMutation(updateMutation, () => {
   return {
     variables: {
       id: updateFields.id,
       name: updateFields.name,
-      type: updateFields.__typename,
+      type: updateFields.type,
+      brand: updateFields.brand,
       age: Number(updateFields.age),
       price: updateFields.price,
     },
     optimisticResponse: {
       updateCraft: {
-        ...updateFields,
-      },
-    },
+        ...updateFields
+      }
+    }
   };
 });
 
 onError(() => {
-  emit('error');
-});
+  emit("error");
+})
 
-const emit = defineEmits(['close', 'updated', 'error']);
+const emit = defineEmits(["close", "updated", "error"]);
 
-async function handleSubmit() {
-  emit('close');
+let updateFields = reactive({ ...props.craft });
+
+async function handleSubmit(e) {
+  emit("close");
   await updateCraft();
-  emit('updated');
+  emit("updated");
 }
 </script>
-<template>
-  <h1>Update Craft {{ craft.name }}</h1>
 
+<template>
+  <div>{{ errorMessage }}</div>
   <form @submit.prevent>
     <div class="form-field">
-      <label for="craftName">Name</label>
-      <input type="text" id="craftName" v-model="updateFields.name" />
-      <label for="craftType">Type</label>
-      <input type="text" id="craftType" v-model="updateFields.__typename" />
-      <label for="craftPrice">Price</label>
-      <input type="number" id="craftPrice" v-model="updateFields.price" />
-      <label for="craftAge">Age</label>
-      <input type="number" id="craftAge" v-model="updateFields.age" />
+      <label for="craftName">Name of craft:</label>
+      <input id="craftName" v-model="updateFields.name" />
     </div>
+    <div class="form-field">
+      <label for="craftType">Type of craft:</label>
+      <input id="craftType" v-model="updateFields.type" />
+    </div>
+    <div class="form-field">
+      <label for="craftBrand">Brand of craft:</label>
+      <input id="craftBrand" v-model="updateFields.brand" />
+    </div>
+    <div class="form-field">
+      <label for="craftAge">Age of craft:</label>
+      <input id="craftAge" v-model="updateFields.age" />
+    </div>
+    <div class="form-field">
+      <label for="craftPrice">Price of craft:</label>
+      <input id="craftPrice" v-model="updateFields.price" />
+    </div>
+    <button @click="emit('close')">Cancel</button>
+    <button @click="handleSubmit()">Update</button>
   </form>
-  <button @click="emit('close')">Cancel</button>
-  <button @click="handleSubmit()">Update</button>
 </template>
-<style>
+
+<style scoped>
 .form-field {
   display: flex;
   flex-direction: column;
-  width: 300px;
-  justify-content: flex-start;
-  align-items: flex-start;
-  margin: 0 auto;
+
+  margin-right: 30px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+label {
+  margin-bottom: 4px;
+}
+
+button {
+  margin: 4px;
 }
 </style>
